@@ -22,9 +22,13 @@ from deep_sort.utils.parser import get_config
 from deep_sort.deep_sort import DeepSort
 import pymysql
 
-# 시작 시간 기록
-start_time = time.time()
+# path 정리
+path = "C:/Users/YongJun/Desktop/YOLO/1228_TNS/images"
+model = torch.load('C:/Users/YongJun/Desktop/YOLO/YOLOv5s_1229.pt')
+image_paths = sorted([os.path.join(path, f) for f in os.listdir(path) if f.endswith(".jpg") or f.endswith(".png")])
+label_paths = sorted([os.path.join(path, f) for f in os.listdir(path) if f.endswith(".txt")])
 
+# DB 연결
 conn = pymysql.connect(
     host='localhost',
     user='root',
@@ -33,10 +37,8 @@ conn = pymysql.connect(
     charset='utf8'
 )
 
-path = "C:/Users/YongJun/Desktop/YOLO/1228_TNS/images"
-model = torch.load('C:/Users/YongJun/Desktop/YOLO/YOLOv5s_1229.pt')
-image_paths = sorted([os.path.join(path, f) for f in os.listdir(path) if f.endswith(".jpg") or f.endswith(".png")])
-label_paths = sorted([os.path.join(path, f) for f in os.listdir(path) if f.endswith(".txt")])
+# DB 저장 데이터 - 시작 시간 기록
+start_time = time.time()
 
 # 라벨링한 클래스
 class_dict = {
@@ -51,6 +53,7 @@ ng_scratch_idx = class_dict['NG_Scratch']
 
 labels = []
 
+# 웹캠 설정
 cap1 = cv2.VideoCapture(0)  
 cap2 = cv2.VideoCapture(1) 
 
@@ -64,11 +67,12 @@ ok_count2 = 0
 ng_blur_count2 = 0
 ng_scratch_count2 = 0
 
-# 최종 탐지
+# 최종 탐지 - 초안
 ok_count = 0
 ng_blur_count = 0
 ng_scratch_count = 0
 
+# YOLO 실행
 while True:
     # 현재 시간 기록
     current_time = time.time()
@@ -92,13 +96,14 @@ while True:
     detections2 = results2.xyxy[0]
     
     
-    # 각 객체에 대해 Loop를 돌며, Line을 지나갔는지 검사합니다.
+    # 각 객체에 대해 Loop를 돌며, Line을 지나갔는지 검사
     for detection in detections1:
-    # 객체의 중심점 좌표를 가져옵니다.
+        
+    # 객체의 중심점 좌표 계산
         center_x = (detection[0] + detection[2]) / 2
         center_y = (detection[1] + detection[3]) / 2
         
-        # 객체가 Line을 지나갔는지 검사합니다.
+        # 객체가 Line을 지나갔는지 검사 - Line 설정 (317 ~ 323)
         if center_x > 317 and center_x < 323:
             label = detection[5]
             labels1.append(label)
@@ -110,7 +115,7 @@ while True:
             elif label == ng_scratch_idx:
                 ng_scratch_count1 += 1
             
-            # 웹캠 2개 탐지 (초안)
+            # 웹캠 2개 탐지 (초안) -> count1 & count2 를 판단해서 count 판별하기
             if ok_count1 and ok_count2:
                 ok_count += 1
 
@@ -120,12 +125,14 @@ while True:
             if ng_scratch_count1 or ng_scratch_count2:
                 ng_scratch_count += 1
     
-    # 각 객체에 대해 Loop를 돌며, Line을 지나갔는지 검사합니다.
+    # 각 객체에 대해 Loop를 돌며, Line을 지나갔는지 검사
     for detection in detections2:
-    # 객체의 중심점 좌표를 가져옵니다.
+
+    # 객체의 중심점 좌표 계산
         center_x = (detection[0] + detection[2]) / 2
         center_y = (detection[1] + detection[3]) / 2
     
+        # 객체가 Line을 지나갔는지 검사 - Line 설정 (317 ~ 323)
         if center_x > 317 and center_x < 323:
             label = detection[5]
             labels2.append(label)
@@ -137,7 +144,7 @@ while True:
             elif label == ng_scratch_idx:
                 ng_scratch_count2 += 1
 
-            # 웹캠 2개 탐지 (초안)          
+            # 웹캠 2개 탐지 (초안) -> count1 & count2 를 판단해서 count 판별하기         
             if ok_count1 and ok_count2:
                 ok_count += 1
 
@@ -149,16 +156,22 @@ while True:
     
     # DB 연동
     cursor = conn.cursor()
-    count = 0 
+    count = 0
+    
     for detection in detections1:
         count += 1
         name = f"name{count}"
+        
+        # SQL 문을 통해서 MariaDB의 Table에 저장 - 제품 , 개수 , 상태 , confidence 등 추가 
+        
+        # (INSERT INTO tns (table name) id (table column ... ) VALUES (%s , %s , ...), (python_msg, python_msg))
+        
         cursor.execute("INSERT INTO tns (id) VALUES (%s)", 
                        (ok_count1))
     conn.commit()
     
     
-    # 동영상에서 나오는 cv2 의 text 
+    # 동영상에서 나오는 cv2 의 text 정리 
     cv2.putText(frame1, f'OK: {ok_count}', 
         (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
     cv2.putText(frame1, f'NG_Blur: {ng_blur_count}', 
