@@ -67,10 +67,15 @@ ok_count2 = 0
 ng_blur_count2 = 0
 ng_scratch_count2 = 0
 
-# 최종 탐지 - 초안
+# 최종 탐지 
 ok_count = 0
-ng_blur_count = 0
-ng_scratch_count = 0
+ng_count = 0
+
+# 추가 부분 
+ok_detected1 = False
+ok_detected2 = False
+ng_detected1 = False
+ng_detected2 = False
 
 # YOLO 실행
 while True:
@@ -114,16 +119,6 @@ while True:
                 ng_blur_count1 += 1
             elif label == ng_scratch_idx:
                 ng_scratch_count1 += 1
-            
-            # 웹캠 2개 탐지 (초안) -> count1 & count2 를 판단해서 count 판별하기
-            if ok_count1 and ok_count2:
-                ok_count += 1
-
-            if ng_blur_count1 or ng_blur_count2:
-                ng_blur_count += 1
-
-            if ng_scratch_count1 or ng_scratch_count2:
-                ng_scratch_count += 1
     
     # 각 객체에 대해 Loop를 돌며, Line을 지나갔는지 검사
     for detection in detections2:
@@ -143,17 +138,29 @@ while True:
                 ng_blur_count2 += 1
             elif label == ng_scratch_idx:
                 ng_scratch_count2 += 1
+   
+    # 추가 부분 
+    if ok_idx in labels1 and ok_idx in labels2:
+        ok_detected1 = True
+        ok_detected2 = True
 
-            # 웹캠 2개 탐지 (초안) -> count1 & count2 를 판단해서 count 판별하기         
-            if ok_count1 and ok_count2:
-                ok_count += 1
+    if ok_detected1 and ok_detected2:
+        ok_count += 1
+        ok_detected1 = False
+        ok_detected2 = False
 
-            if ng_blur_count1 or ng_blur_count2:
-                ng_blur_count += 1
+    if ng_blur_idx in labels1 or ng_scratch_idx in labels1:
+        ng_detected1 = True
 
-            if ng_scratch_count1 or ng_scratch_count2:
-                ng_scratch_count += 1
-    
+    if ng_blur_idx in labels2 or ng_scratch_idx in labels2:
+        ng_detected2 = True
+
+    if ng_detected1 or ng_detected2:
+        ng_count += 1
+        ng_detected1 = False
+        ng_detected2 = False
+       
+   
     # DB 연동
     cursor = conn.cursor()
     count = 0
